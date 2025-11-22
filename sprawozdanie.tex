@@ -1,0 +1,177 @@
+% Sprawozdanie z badań metaheurystyk dla cVRP
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage{polski}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{hyperref}
+\usepackage{pdflscape}
+
+\title{Algorytmy Optymalizacji Inspirowane Naturą\\Projekt startowy}
+\author{Jakub Wasilewski 263852}
+\date{20.11.2025}
+
+\begin{document}
+\maketitle
+
+\section{Sformułowanie zadania}
+Celem jest implementacja i przebadanie metaheurystyki Algorytmu Ewolucyjnego (EA) dla problemu cVRP oraz porównanie jej z metodami nieewolucyjnymi: algorytmem zachłannym (greedy), symulowanym wyżarzaniem (SA) i losowym przeszukiwaniem. Funkcja celu minimalizuje łączny koszt tras floty pojazdów o ograniczonej pojemności.
+
+\section{Sposób rozwiązywania zadania}
+Rozwiązania kodowane są jako permutacje klientów (jak w TSP). Dekoder dzieli permutację na trasy spełniające ograniczenie pojemności i liczy koszt sumując odległości (EUC\_2D, zaokrąglenie). Metaheurystyki operują na permutacjach; ocena to łączny koszt z dekodera.
+
+\section{Metody użyte do rozwiązania zadania}
+\begin{itemize}
+    \item Algorytm losowy
+    \item Algorytm zachłanny
+    \item Symulowane wyżarzanie
+    \item Algorytm ewolucyjny
+\end{itemize}
+
+\section{Implementacja}
+\subsection{Reprezentacja i dekoder}
+Każde rozwiązanie to permutacja klientów (magazyn pomijany). Dekoder przechodzi po permutacji, sumuje zapotrzebowanie i gdy pojemność jest przekroczona, rozpoczyna nową trasę. Koszt to suma odległości z/do magazynu i między kolejnymi klientami (EUC\_2D, zaokrąglone).
+
+\subsection{Algorytm losowy}
+Start: losowa permutacja klientów generowana \texttt{random\_iterations} razy w jednym uruchomieniu. Każde rozwiązanie dekodowane i oceniane. Log: w każdej iteracji zapisujemy rozwiązanie najlepsze dotąd, bieżące, średnią i najgorsze (best/current/avg/worst).
+
+\subsection{Algorytm zachłanny}
+Start: wybieramy różne punkty startowe (rotacja po klientach). W każdej konstrukcji wybieramy najbliższego nieodwiedzonego klienta (nearest-neighbour), aż odwiedzimy wszystkich. Parametr \texttt{greedy\_restarts} określa liczbę startów dla jednego uruchomienia (domyślnie liczba klientów). Log: po każdym restarcie zapisujemy best/current/avg/worst.
+
+\subsection{Symulowane wyżarzanie (SA)}
+Rozwiąznaie startowe: permutacja zachłanna od losowego węzła startowego. 
+Sąsiedztwo: zamiana dwóch genów (swap). 
+Akceptacja rozwiązania: jeśli koszt lepszy lub z prawdopodobieństwem $\exp(-\Delta/T)$.
+Parametry: temperatura początkowa $T_0$, minimalna $T_{\min}$, współczynnik chłodzenia $\alpha$, liczba iteracji na temperaturę. Log: best/current/avg/worst w każdej iteracji, co pozwala obserwować skoki akceptacji gorszych ruchów.
+
+\subsection{Algorytm ewolucyjny (EA)}
+\begin{itemize}
+    \item Inicjalizacja: losowe permutacje (pop\_size), każda dekodowana i oceniana.
+    \item Selekcja: turniejowa, rozmiar \texttt{ea\_tournament}; większa wartość zwiększa ciśnienie selekcyjne.
+    \item Krzyżowanie: Ordered Crossover (OX) z prawdopodobieństwem Px; w przeciwnym razie kopiujemy rodzica.
+    \item Mutacja: swap dwóch genów z prawdopodobieństwem Pm;
+    \item Elitaryzm: kopiowanie najlepszych \texttt{ea\_elites} osobników do następnego pokolenia bez zmian.
+    \item Parametry: \texttt{ea\_population}, \texttt{ea\_generations}, \texttt{ea\_crossover\_rate}, \texttt{ea\_mutation\_rate}, \texttt{ea\_tournament}, \texttt{ea\_elites}.
+    \item Log: best/avg/worst w każdym pokoleniu (populacja), co pozwala śledzić zbieżność i różnorodność.
+\end{itemize}
+
+\subsection{Konfiguracja i logi}
+Parametry w plikach \texttt{config\_baseline.ini} / \texttt{config\_tuning.ini} (katalogi danych/logów, liczba uruchomień per algorytm, ustawienia EA/SA/greedy/losowy). Program zapisuje logi per-run w CSV, zbiorcze statystyki w \texttt{summary.csv}. Skrypt \texttt{scripts/plot\_logs.py} generuje wykresy pojedynczych przebiegów, zestawienia i wykres słupkowy najlepszych wyników.
+
+\section{Pliki wejściowe}
+Instancje z katalogu \texttt{inputs/}: A-n32-k5, A-n37-k6, A-n39-k5, A-n45-k6, A-n48-k7, A-n54-k7, A-n60-k9. Optymalne koszty z \texttt{optimal-solutions/*.sol}.
+
+\section{Procedura badawcza}
+\begin{itemize}
+    \item Uruchomienie: \texttt{./bin/vrp\_runner config\_baseline.ini}.
+    \item Parametry bazowe: random\_runs=20 (iteracje=1000), greedy\_runs=N (restarts=32), sa\_runs=15 ($T_0=100$, $T_{\min}=0{,}01$, $\alpha=0{,}995$, iter/temp=200), ea\_runs=15 (pop=100, gen=100, Px=0{,}7, Pm=0{,}1, tour=5, elites=1).
+    \item Wizualizacje: \texttt{plot\_logs.py} generuje wykresy single/combined/bar\_best do \texttt{zadanego w zmiennej folderu/}.
+\end{itemize}
+
+\section{Wyniki badań przed tuningiem}
+
+\subsection{Tabela zbiorcza (logs\_baseline/summary.csv)}
+\begin{table}[H]
+\centering
+\scriptsize
+\caption{Zbiorcze statystyki (przed tuningiem)}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrrrrrrrrrrrrrrrrr}
+\toprule
+Instance & Optimal & Random Runs & Random Best & Random Worst & Random Avg & Random Std & Greedy Runs & Greedy Best & Greedy Worst & Greedy Avg & Greedy Std & EA Runs & EA Best & EA Worst & EA Avg & EA Std & SA Runs & SA Best & SA Worst & SA Avg & SA Std \\
+\midrule
+A-n54-k7 & 1167 & 1000 & 2449 & 2848 & 2724.51 & 60.2820 & 54 & 1380 & 1380 & 1380 & 0.00 & 10 & 1409 & 1644 & 1500.80 & 81.8997 & 10 & 1273 & 1446 & 1376.30 & 44.8844 \\
+A-n39-k5 & 822 & 1000 & 1552 & 1865 & 1748.80 & 45.3239 & 39 & 920 & 920 & 920 & 0.00 & 10 & 969 & 1105 & 1049.90 & 48.8190 & 10 & 907 & 1004 & 945.10 & 32.2380 \\
+A-n32-k5 & 784 & 1000 & 1420 & 1781 & 1655.76 & 49.8083 & 32 & 941 & 941 & 941 & 0.00 & 10 & 941 & 1041 & 991.40 & 29.4761 & 10 & 842 & 949 & 895.70 & 29.4824 \\
+A-n37-k6 & 949 & 1000 & 1549 & 1880 & 1788.69 & 45.1863 & 37 & 1058 & 1058 & 1058 & 0.00 & 10 & 1039 & 1242 & 1119.90 & 57.5994 & 10 & 967 & 1097 & 1038.10 & 36.8658 \\
+A-n48-k7 & 1073 & 1000 & 2166 & 2549 & 2390.06 & 56.3475 & 48 & 1301 & 1301 & 1301 & 0.00 & 10 & 1246 & 1415 & 1345.00 & 52.5928 & 10 & 1188 & 1315 & 1241.40 & 35.7413 \\
+A-n60-k9 & 1354 & 1000 & 2834 & 3226 & 3104.78 & 64.5207 & 60 & 1524 & 1524 & 1524 & 0.00 & 10 & 1605 & 1805 & 1695.80 & 63.2784 & 10 & 1480 & 1604 & 1549.10 & 36.3496 \\
+A-n45-k6 & 944 & 1000 & 2077 & 2428 & 2303.96 & 55.3456 & 45 & 1119 & 1119 & 1119 & 0.00 & 10 & 1131 & 1400 & 1228.70 & 82.5022 & 10 & 1027 & 1160 & 1100.40 & 39.5505 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+\clearpage
+
+\subsection{Wybrane wykresy}
+Poniżej trzy przykładowe zestawy wykresów (instancje A-n32-k5, A-n45-k6, A-n60-k9). Dla każdej instancji pokazano: (1) przebiegi best wszystkich algorytmów, (2) przebiegi pojedynczych algorytmów (best/current/avg/worst), (3) słupki najlepszych wyników z wielu uruchomień.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{plots_baseline/A-n32-k5/combined_best.png}
+    \caption{A-n32-k5: porównanie przebiegów najlepszych wyników.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.48\textwidth]{plots_baseline/A-n32-k5/random_single.png}
+    \includegraphics[width=0.48\textwidth]{plots_baseline/A-n32-k5/greedy_single.png}\\
+    \includegraphics[width=0.48\textwidth]{plots_baseline/A-n32-k5/sa_single.png}
+    \includegraphics[width=0.48\textwidth]{plots_baseline/A-n32-k5/ea_single.png}
+    \caption{A-n32-k5: przebiegi pojedynczych algorytmów (best/current/avg/worst).}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{plots_baseline/A-n32-k5/bar_best.png}
+    \caption{A-n32-k5: najlepsze wyniki ze wszystkich uruchomień (losowy/greedy/SA/EA) z linią optimum.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{plots_baseline/A-n45-k6/combined_best.png}
+    \caption{A-n45-k6: porównanie przebiegów najlepszych wyników.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.48\textwidth]{plots_baseline/A-n45-k6/random_single.png}
+    \includegraphics[width=0.48\textwidth]{plots_baseline/A-n45-k6/greedy_single.png}\\
+    \includegraphics[width=0.48\textwidth]{plots_baseline/A-n45-k6/sa_single.png}
+    \includegraphics[width=0.48\textwidth]{plots_baseline/A-n45-k6/ea_single.png}
+    \caption{A-n45-k6: przebiegi pojedynczych algorytmów.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{plots_baseline/A-n45-k6/bar_best.png}
+    \caption{A-n45-k6: najlepsze wyniki ze wszystkich uruchomień z linią optimum.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{plots_baseline/A-n60-k9/combined_best.png}
+    \caption{A-n60-k9: porównanie przebiegów najlepszych wyników.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.48\textwidth]{plots_baseline/A-n60-k9/random_single.png}
+    \includegraphics[width=0.48\textwidth]{plots_baseline/A-n60-k9/greedy_single.png}\\
+    \includegraphics[width=0.48\textwidth]{plots_baseline/A-n60-k9/sa_single.png}
+    \includegraphics[width=0.48\textwidth]{plots_baseline/A-n60-k9/ea_single.png}
+    \caption{A-n60-k9: przebiegi pojedynczych algorytmów.}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{plots_baseline/A-n60-k9/bar_best.png}
+    \caption{A-n60-k9: najlepsze wyniki ze wszystkich uruchomień z linią optimum.}
+\end{figure}
+
+\subsection{Wnioski (etap bazowy)}
+\begin{itemize}
+    \item Greedy jest stabilny i często lepszy od niedostrojonych EA/SA przy obecnym krótkim budżecie obliczeń.
+    \item SA w ustawieniach bazowych jest blisko optimum, wymaga więcej kroków/temperatur, by przebić greedy na trudniejszych instancjach.
+    \item EA (OX+swap, mała populacja/pokolenia) przegrywa z greedy; potrzebne: większa populacja, bogatsze mutacje (inwersja/2-opt), lepsze krzyżowania (PMX/CX), inicjalizacja z greedy.
+    \item Dalsze kroki: strojenie parametrów, dodanie nowych operatorów.
+\end{itemize}
+
+\section{Wyniki badań po tuningu}
+TO DO (do uzupełnienia po dodaniu operatorów i uruchomieniu \texttt{config\_tuning.ini}).
+
+\end{document}
