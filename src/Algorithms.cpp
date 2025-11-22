@@ -6,9 +6,17 @@
 #include "VRP.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <limits>
+#include <string>
 #include <unordered_set>
+
+static std::string toLowerCopy(std::string text) {
+    std::transform(text.begin(), text.end(), text.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return text;
+}
 
 // Reprezentacja osobnika dla EA.
 struct Individual {
@@ -102,23 +110,26 @@ Solution runGreedy(const Problem& problem, int restarts, CSVLogger& logger) {
 
 // Symulowane wyżarzanie z sąsiedztwem swap i stałym chłodzeniem.
 Solution runSimulatedAnnealing(const Problem& problem, const Config& cfg, CSVLogger& logger) {
-    int randomStart = 2 + (randInt(0, problem.dimension - 2));
-    std::vector<int> startPerm = buildGreedyPermutation(problem, randomStart);
-    Solution currentSol = decodePermutation(problem, startPerm);
+    std::vector<int> currentPerm = randomPermutation(problem);
+    Solution currentSol = decodePermutation(problem, currentPerm);
     Solution bestSol = currentSol;
     double temp = cfg.saInitialTemp;
     double worstCost = currentSol.cost;
     double sumCost = currentSol.cost;
     int steps = 1;
     int iterationCounter = 0;
+    // Zaloguj stan początkowy z best=current=avg=worst.
+    logger.logRow("0," + std::to_string(bestSol.cost) + "," + std::to_string(currentSol.cost) + "," +
+                  std::to_string(currentSol.cost) + "," + std::to_string(worstCost));
+    iterationCounter = 1;
     while (temp > cfg.saMinTemp) {
         for (int k = 0; k < cfg.saIterations; ++k) {
-            std::vector<int> neighborPerm = swapNeighbor(startPerm);
+            std::vector<int> neighborPerm = swapNeighbor(currentPerm);
             Solution neighborSol = decodePermutation(problem, neighborPerm);
             double delta = neighborSol.cost - currentSol.cost;
             bool accept = delta < 0 || randUnit() < std::exp(-delta / temp);
             if (accept) {
-                startPerm = neighborPerm;
+                currentPerm = neighborPerm;
                 currentSol = neighborSol;
             }
             if (currentSol.cost < bestSol.cost) bestSol = currentSol;
@@ -156,6 +167,71 @@ static std::vector<int> orderedCrossover(const std::vector<int>& p1, const std::
     return child;
 }
 
+// Krzyżowanie PMX: mapuje segment z p1 na p2 i wypełnia zgodnie z odwzorowaniem.
+static std::vector<int> pmxCrossover(const std::vector<int>& p1, const std::vector<int>& p2) {
+    int n = static_cast<int>(p1.size());
+    std::vector<int> child(n, -1);
+    int a = randInt(0, n - 1);
+    int b = randInt(0, n - 1);
+    if (a > b) std::swap(a, b);
+    // Skopiuj segment z p1.
+    for (int i = a; i <= b; ++i) {
+        child[i] = p1[i];
+    }
+    auto contains = [&](int val) {
+        return std::find(child.begin(), child.end(), val) != child.end();
+    };
+    // Mapowanie elementów z p2 do dziecka.
+    for (int i = a; i <= b; ++i) {
+        int val = p2[i];
+        if (contains(val)) continue;
+        int pos = i;
+        int mapped = val;
+        // Znajdź pozycję, która nie jest jeszcze zajęta zgodnie z mapowaniem.
+        while (child[pos] != -1) {
+            mapped = p1[pos];
+            pos = static_cast<int>(std::find(p2.begin(), p2.end(), mapped) - p2.begin());
+        }
+        child[pos] = val;
+    }
+    // Uzupełnij puste miejsca kolejnością z p2.
+    for (int i = 0; i < n; ++i) {
+        if (child[i] == -1) {
+            for (int j = 0; j < n; ++j) {
+                int candidate = p2[j];
+                if (!contains(candidate)) {
+                    child[i] = candidate;
+                    break;
+                }
+            }
+        }
+    }
+    return child;
+}
+
+// Krzyżowanie cyklowe (CX): buduje cykl pozycji z rodziców.
+static std::vector<int> cycleCrossover(const std::vector<int>& p1, const std::vector<int>& p2) {
+    int n = static_cast<int>(p1.size());
+    std::vector<int> child(n, -1);
+    std::vector<bool> visited(n, false);
+    bool takeFromP1 = true;
+    int start = 0;
+    while (std::find(visited.begin(), visited.end(), false) != visited.end()) {
+        // Znajdź pierwszy nieodwiedzony indeks.
+        while (start < n && visited[start]) ++start;
+        int idx = start;
+        // Przejdź cykl.
+        do {
+            visited[idx] = true;
+            child[idx] = takeFromP1 ? p1[idx] : p2[idx];
+            int val = p1[idx];
+            idx = static_cast<int>(std::find(p2.begin(), p2.end(), val) - p2.begin());
+        } while (idx != start);
+        takeFromP1 = !takeFromP1;
+    }
+    return child;
+}
+
 // Mutacja swap z prawdopodobieństwem Pm.
 static void mutateSwap(std::vector<int>& perm, double mutationRate) {
     if (perm.size() < 2) return;
@@ -164,6 +240,49 @@ static void mutateSwap(std::vector<int>& perm, double mutationRate) {
         int j = randInt(0, static_cast<int>(perm.size()) - 1);
         while (j == i) j = randInt(0, static_cast<int>(perm.size()) - 1);
         std::swap(perm[i], perm[j]);
+    }
+}
+
+// Mutacja inwersji: odwraca losowy podciąg permutacji.
+static void mutateInversion(std::vector<int>& perm, double mutationRate) {
+    if (perm.size() < 2) return;
+    if (randUnit() < mutationRate) {
+        int a = randInt(0, static_cast<int>(perm.size()) - 1);
+        int b = randInt(0, static_cast<int>(perm.size()) - 1);
+        if (a > b) std::swap(a, b);
+        std::reverse(perm.begin() + a, perm.begin() + b + 1);
+    }
+}
+
+// Lokalna poprawa 2-opt: jedna losowa zamiana dwóch krawędzi jeśli poprawia wynik.
+static void twoOptOnce(std::vector<int>& perm, const Problem& problem) {
+    int n = static_cast<int>(perm.size());
+    if (n < 4) return;
+    int i = randInt(0, n - 2);
+    int k = randInt(i + 1, n - 1);
+    // Oblicz koszt fragmentu przed/po 2-opt (w permutacji; dekoder doda depo później).
+    auto edgeCost = [&](int aIdx, int bIdx) {
+        int aNode = perm[aIdx];
+        int bNode = perm[bIdx];
+        return problem.distances[aNode][bNode];
+    };
+    double before = 0.0;
+    double after = 0.0;
+    if (i > 0) {
+        before += edgeCost(i - 1, i);
+        after += edgeCost(i - 1, k);
+    }
+    if (k + 1 < n) {
+        before += edgeCost(k, k + 1);
+        after += edgeCost(i, k + 1);
+    }
+    // Środek segmentu.
+    for (int t = i; t < k; ++t) {
+        before += edgeCost(t, t + 1);
+        after += edgeCost(t + 1, t);
+    }
+    if (after + 1e-9 < before) {
+        std::reverse(perm.begin() + i, perm.begin() + k + 1);
     }
 }
 
@@ -183,10 +302,36 @@ static int tournamentSelect(const std::vector<Individual>& pop, int tourSize) {
 
 // Algorytm ewolucyjny: inicjalizacja losowa, turniej, OX, mutacja swap, elity.
 Solution runEvolutionary(const Problem& problem, const Config& cfg, CSVLogger& logger) {
+    const std::string crossoverType = toLowerCopy(cfg.eaCrossoverType);
+    const std::string mutationType = toLowerCopy(cfg.eaMutationType);
+    auto crossoverFn = [&](const std::vector<int>& p1, const std::vector<int>& p2) {
+        if (crossoverType == "pmx") return pmxCrossover(p1, p2);
+        if (crossoverType == "cx" || crossoverType == "cycle") return cycleCrossover(p1, p2);
+        // Domyślnie OX.
+        return orderedCrossover(p1, p2);
+    };
+    auto mutationFn = [&](std::vector<int>& perm) {
+        if (mutationType == "inversion" || mutationType == "inv") mutateInversion(perm, cfg.eaMutationRate);
+        else mutateSwap(perm, cfg.eaMutationRate);
+    };
+    auto localImprove = [&](std::vector<int>& perm) {
+        if (cfg.eaTwoOptRate > 0.0 && randUnit() < cfg.eaTwoOptRate) {
+            twoOptOnce(perm, problem);
+        }
+    };
+
     std::vector<Individual> population;
     population.reserve(cfg.eaPopulation);
+    int greedyCount = static_cast<int>(std::round(cfg.eaGreedyInitFraction * cfg.eaPopulation));
+    int startId = 2;
     for (int i = 0; i < cfg.eaPopulation; ++i) {
-        std::vector<int> perm = randomPermutation(problem);
+        std::vector<int> perm;
+        if (i < greedyCount) {
+            perm = buildGreedyPermutation(problem, startId);
+            startId = 2 + ((startId - 1) % (problem.dimension - 1));
+        } else {
+            perm = randomPermutation(problem);
+        }
         Solution sol = decodePermutation(problem, perm);
         population.push_back(Individual{perm, sol.cost});
     }
@@ -224,9 +369,10 @@ Solution runEvolutionary(const Problem& problem, const Config& cfg, CSVLogger& l
             const auto& parent1 = population[p1Idx].perm;
             const auto& parent2 = population[p2Idx].perm;
             std::vector<int> childPerm;
-            if (randUnit() < cfg.eaCrossoverRate) childPerm = orderedCrossover(parent1, parent2);
+            if (randUnit() < cfg.eaCrossoverRate) childPerm = crossoverFn(parent1, parent2);
             else childPerm = parent1;
-            mutateSwap(childPerm, cfg.eaMutationRate);
+            mutationFn(childPerm);
+            localImprove(childPerm);
             Solution childSol = decodePermutation(problem, childPerm);
             newPop.push_back(Individual{childPerm, childSol.cost});
         }

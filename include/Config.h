@@ -44,6 +44,14 @@ struct Config {
     int eaTournament;
     // Parametry EA: liczba osobników elitarnych.
     int eaElites;
+    // Parametry EA: wybór operatora krzyżowania (np. ox/pmx/cx).
+    std::string eaCrossoverType;
+    // Parametry EA: wybór operatora mutacji (np. swap/inversion).
+    std::string eaMutationType;
+    // Ułamek populacji inicjalizowany zachłannie (0..1).
+    double eaGreedyInitFraction;
+    // Prawdopodobieństwo uruchomienia lokalnego ulepszania 2-opt.
+    double eaTwoOptRate;
     // Flaga pozwalająca na logowanie rozbudowane.
     bool verbose;
 };

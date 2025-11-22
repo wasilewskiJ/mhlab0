@@ -62,6 +62,10 @@ Config ConfigLoader::buildConfig(const std::string& path) {
     cfg.eaMutationRate = getDouble("ea_mutation_rate", 0.1);
     cfg.eaTournament = getInt("ea_tournament", 5);
     cfg.eaElites = getInt("ea_elites", 1);
+    cfg.eaCrossoverType = getString("ea_crossover_type", "pmx");
+    cfg.eaMutationType = getString("ea_mutation_type", "inversion");
+    cfg.eaGreedyInitFraction = getDouble("ea_greedy_init_fraction", 0.0);
+    cfg.eaTwoOptRate = getDouble("ea_two_opt_rate", 0.0);
     cfg.verbose = getBool("verbose", true);
     return cfg;
 }

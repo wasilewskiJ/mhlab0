@@ -19,6 +19,9 @@
 \begin{document}
 \maketitle
 
+\tableofcontents
+\clearpage
+
 \section{Sformułowanie zadania}
 Celem jest implementacja i przebadanie metaheurystyki Algorytmu Ewolucyjnego (EA) dla problemu cVRP oraz porównanie jej z metodami nieewolucyjnymi: algorytmem zachłannym (greedy), symulowanym wyżarzaniem (SA) i losowym przeszukiwaniem. Funkcja celu minimalizuje łączny koszt tras floty pojazdów o ograniczonej pojemności.
 
@@ -27,10 +30,10 @@ Rozwiązania kodowane są jako permutacje klientów (jak w TSP). Dekoder dzieli 
 
 \section{Metody użyte do rozwiązania zadania}
 \begin{itemize}
-    \item Algorytm losowy
-    \item Algorytm zachłanny
-    \item Symulowane wyżarzanie
-    \item Algorytm ewolucyjny
+  \item Algorytm losowy (random)
+  \item Algorytm zachłanny (greedy)
+  \item Symulowane wyżarzanie (SA)
+  \item Algorytm ewolucyjny (EA)
 \end{itemize}
 
 \section{Implementacja}
@@ -38,30 +41,70 @@ Rozwiązania kodowane są jako permutacje klientów (jak w TSP). Dekoder dzieli 
 Każde rozwiązanie to permutacja klientów (magazyn pomijany). Dekoder przechodzi po permutacji, sumuje zapotrzebowanie i gdy pojemność jest przekroczona, rozpoczyna nową trasę. Koszt to suma odległości z/do magazynu i między kolejnymi klientami (EUC\_2D, zaokrąglone).
 
 \subsection{Algorytm losowy}
-Start: losowa permutacja klientów generowana \texttt{random\_iterations} razy w jednym uruchomieniu. Każde rozwiązanie dekodowane i oceniane. Log: w każdej iteracji zapisujemy rozwiązanie najlepsze dotąd, bieżące, średnią i najgorsze (best/current/avg/worst).
+\label{sec:random}
+\begin{itemize}
+    \item Proste losowe przeszukiwanie przestrzeni rozwiązań bez heurystyk.
+    \item W każdej iteracji generowana jest losowa permutacja klientów, która jest następnie dekodowana na rozwiązanie cVRP.
+    \item \textbf{Parametry:} Liczba iteracji: 2000 (\texttt{random\_iterations=2000}).
+    \item \textbf{Log:} W każdej iteracji zapisywane są: najlepsze rozwiązanie dotąd (best), bieżące (current), średnia ze wszystkich (avg), najgorsze dotąd (worst).
+\end{itemize}
 
 \subsection{Algorytm zachłanny}
-Start: wybieramy różne punkty startowe (rotacja po klientach). W każdej konstrukcji wybieramy najbliższego nieodwiedzonego klienta (nearest-neighbour), aż odwiedzimy wszystkich. Parametr \texttt{greedy\_restarts} określa liczbę startów dla jednego uruchomienia (domyślnie liczba klientów). Log: po każdym restarcie zapisujemy best/current/avg/worst.
+\label{sec:greedy}
+\begin{itemize}
+    \item Konstrukcja rozwiązania poprzez zachłanny wybór najbliższego nieodwiedzonego klienta (nearest-neighbour).
+    \item Algorytm rozpoczyna od wybranego punktu startowego i iteracyjnie dodaje najbliższego klienta do trasy, aż wszyscy zostaną odwiedzeni. Dekoder automatycznie tworzy nowe trasy przy przekroczeniu pojemności.
+    \item \textbf{Multi-start:} Wykonuje się wiele restartów z różnymi punktami startowymi (rotacja po klientach), by zwiększyć szansę na znalezienie dobrego rozwiązania.
+    \item \textbf{Parametry:} Liczba restartów: \texttt{greedy\_restarts} (domyślnie równa liczbie klientów).
+    \item \textbf{Log:} Po każdym restarcie zapisywane są statystyki best/current/avg/worst.
+\end{itemize}
 
 \subsection{Symulowane wyżarzanie (SA)}
-Rozwiąznaie startowe: permutacja zachłanna od losowego węzła startowego. 
-Sąsiedztwo: zamiana dwóch genów (swap). 
-Akceptacja rozwiązania: jeśli koszt lepszy lub z prawdopodobieństwem $\exp(-\Delta/T)$.
-Parametry: temperatura początkowa $T_0$, minimalna $T_{\min}$, współczynnik chłodzenia $\alpha$, liczba iteracji na temperaturę. Log: best/current/avg/worst w każdej iteracji, co pozwala obserwować skoki akceptacji gorszych ruchów.
+\label{sec:sa}
+\begin{itemize}
+    \item Metaheurystyka inspirowana procesem wyżarzania metali - stopniowe "oziębianie" systemu pozwala na wyjście z minimów lokalnych.
+    \item \textbf{Rozwiązanie startowe:} Losowa permutacja klientów (każde uruchomienie startuje z innego punktu przestrzeni rozwiązań).
+    \item \textbf{Sąsiedztwo:} Operator swap - zamiana dwóch losowych pozycji w permutacji. Prosty operator pozwalający na eksplorację różnych konfiguracji tras.
+    \item \textbf{Akceptacja rozwiązania:} 
+    \begin{itemize}
+        \item Jeśli nowe rozwiązanie jest lepsze (niższy koszt) - zawsze akceptowane.
+        \item Jeśli gorsze - akceptowane z prawdopodobieństwem $\exp(-\Delta/T)$, gdzie $\Delta$ to różnica kosztów, a $T$ to bieżąca temperatura.
+        \item Wysoka temperatura na początku pozwala akceptować gorsze ruchy (eksploracja), niska na końcu wymusza schodzenie do minimum (eksploatacja).
+    \end{itemize}
+    \item \textbf{Schemat chłodzenia:} Temperatura obniżana geometrycznie: $T_{i+1} = \alpha \cdot T_i$, gdzie $\alpha$ to współczynnik chłodzenia (np. 0.995).
+    \item \textbf{Parametry:} Temperatura początkowa $T_0$, minimalna $T_{\min}$, współczynnik chłodzenia $\alpha$, liczba iteracji na każdą temperaturę.
+    \item \textbf{Kryterium stopu:} Algorytm kończy się gdy temperatura spadnie poniżej $T_{\min}$.
+    \item \textbf{Log:} W każdej iteracji zapisywane są best/current/avg/worst, co pozwala obserwować charakterystyczne "skoki" przy akceptacji gorszych rozwiązań.
+\end{itemize}
 
 \subsection{Algorytm ewolucyjny (EA)}
+\label{sec:ea}
 \begin{itemize}
-    \item Inicjalizacja: losowe permutacje (pop\_size), każda dekodowana i oceniana.
-    \item Selekcja: turniejowa, rozmiar \texttt{ea\_tournament}; większa wartość zwiększa ciśnienie selekcyjne.
-    \item Krzyżowanie: Ordered Crossover (OX) z prawdopodobieństwem Px; w przeciwnym razie kopiujemy rodzica.
-    \item Mutacja: swap dwóch genów z prawdopodobieństwem Pm;
-    \item Elitaryzm: kopiowanie najlepszych \texttt{ea\_elites} osobników do następnego pokolenia bez zmian.
-    \item Parametry: \texttt{ea\_population}, \texttt{ea\_generations}, \texttt{ea\_crossover\_rate}, \texttt{ea\_mutation\_rate}, \texttt{ea\_tournament}, \texttt{ea\_elites}.
-    \item Log: best/avg/worst w każdym pokoleniu (populacja), co pozwala śledzić zbieżność i różnorodność.
+    \item \textbf{Metoda:} Metaheurystyka inspirowana ewolucją biologiczną - populacja rozwiązań ewoluuje przez selekcję, krzyżowanie i mutację.
+    \item \textbf{Inicjalizacja:} Populacja losowych permutacji (rozmiar \texttt{ea\_population}), każda dekodowana i oceniana.
+    \item \textbf{Selekcja:} Turniejowa - losujemy \texttt{ea\_tournament} osobników i wybieramy najlepszego. Większy turniej zwiększa presję selekcyjną (silniejsze osobniki mają większą szansę reprodukcji).
+    \item \textbf{Krzyżowanie:} 
+    \begin{itemize}
+        \item Operator Ordered Crossover (OX) - kopiuje segment od rodzica 1, uzupełnia brakujące elementy w kolejności z rodzica 2.
+        \item Operator Partially Mapped Crossover (PMX) - wymienia segmenty między rodzicami i naprawia konflikty przez mapowanie pozycji.
+        \item Oba operatory zachowują poprawność permutacji (każdy klient występuje dokładnie raz).
+        \item Stosowane z prawdopodobieństwem \texttt{ea\_crossover\_rate} (Px); w przeciwnym razie kopiowany jest rodzic bez zmian.
+    \end{itemize}
+    \item \textbf{Mutacja:} 
+    \begin{itemize}
+        \item Swap - zamienia miejscami dwa losowo wybrane geny (klientów) w permutacji. Prosty operator lokalnej zmiany.
+        \item Inversion - odwraca kolejność genów w losowo wybranym segmencie permutacji. Większa zmiana niż swap.
+        \item Wprowadzają różnorodność genetyczną, pozwalają uciec z minimów lokalnych.
+        \item Każdy gen mutowany z prawdopodobieństwem \texttt{ea\_mutation\_rate} (Pm).
+    \end{itemize}
+    \item \textbf{Elitaryzm:} Kopiowanie \texttt{ea\_elites} najlepszych osobników do następnego pokolenia bez zmian - zapewnia że najlepsze rozwiązania nie zostaną utracone.
+    \item \textbf{Parametry:} \texttt{ea\_population}, \texttt{ea\_generations}, \texttt{ea\_crossover\_rate}, \texttt{ea\_mutation\_rate}, \texttt{ea\_tournament}, \texttt{ea\_elites}, typ krzyżowania, typ mutacji.
+    \item \textbf{Kryterium stopu:} Algorytm kończy się po wykonaniu \texttt{ea\_generations} pokoleń.
+    \item \textbf{Log:} W każdym pokoleniu zapisywane są statystyki całej populacji: best (najlepszy osobnik), avg (średnia populacji), worst (najgorszy osobnik) - pozwala śledzić zbieżność i różnorodność.
 \end{itemize}
 
 \subsection{Konfiguracja i logi}
-Parametry w plikach \texttt{config\_baseline.ini} / \texttt{config\_tuning.ini} (katalogi danych/logów, liczba uruchomień per algorytm, ustawienia EA/SA/greedy/losowy). Program zapisuje logi per-run w CSV, zbiorcze statystyki w \texttt{summary.csv}. Skrypt \texttt{scripts/plot\_logs.py} generuje wykresy pojedynczych przebiegów, zestawienia i wykres słupkowy najlepszych wyników.
+Parametry w plikach \texttt{config\_baseline.ini} / \texttt{config\_tuning.ini} (katalogi danych/logów, liczba uruchomień per algorytm, ustawienia EA/SA/greedy/losowy). Program zapisuje logi dla każdego uruchomienia w plikach CSV, a zbiorcze statystyki w \texttt{summary.csv}. Skrypt \texttt{scripts/plot\_logs.py} generuje wykresy pojedynczych przebiegów, zestawienia i wykres słupkowy najlepszych wyników.
 
 \section{Pliki wejściowe}
 Instancje z katalogu \texttt{inputs/}: A-n32-k5, A-n37-k6, A-n39-k5, A-n45-k6, A-n48-k7, A-n54-k7, A-n60-k9. Optymalne koszty z \texttt{optimal-solutions/*.sol}.
@@ -69,41 +112,51 @@ Instancje z katalogu \texttt{inputs/}: A-n32-k5, A-n37-k6, A-n39-k5, A-n45-k6, A
 \section{Procedura badawcza}
 \begin{itemize}
     \item Uruchomienie: \texttt{./bin/vrp\_runner config\_baseline.ini}.
-    \item Parametry bazowe: random\_runs=20 (iteracje=1000), greedy\_runs=N (restarts=32), sa\_runs=15 ($T_0=100$, $T_{\min}=0{,}01$, $\alpha=0{,}995$, iter/temp=200), ea\_runs=15 (pop=100, gen=100, Px=0{,}7, Pm=0{,}1, tour=5, elites=1).
-    \item Wizualizacje: \texttt{plot\_logs.py} generuje wykresy single/combined/bar\_best do \texttt{zadanego w zmiennej folderu/}.
+    \item Parametry bazowe: random\_runs=1000 (iteracje=2000), greedy\_runs=N (restarts=32), sa\_runs=10 ($T_0=100$, $T_{\min}=0{,}01$, $\alpha=0{,}995$, iter/temp=20), ea\_runs=10 (pop=100, gen=2000, Px=0{,}7, Pm=0{,}1, tour=5, elites=1, krzyżowanie: OX, mutacja: swap).
+    \item Wizualizacje: \texttt{plot\_logs.py} generuje wykresy single/combined/bar\_best do \texttt{logs\_*/} oraz \texttt{plots\_*/}.
 \end{itemize}
 
-\section{Wyniki badań przed tuningiem}
+\section{Wyniki badań przed strojeniem metaheurystyk}
+\label{sec:baseline}
 
-\subsection{Tabela zbiorcza (logs\_baseline/summary.csv)}
+\subsection{Wyniki zbiorcze}
+
+Tabela przedstawia statystyki wyników z wielu uruchomień każdego algorytmu. Dla każdego algorytmu przeprowadzono N niezależnych uruchomień, każde zwracające najlepsze znalezione rozwiązanie. Kolumny Best/Worst/Avg/Std oznaczają odpowiednio: najlepszy wynik ze wszystkich N uruchomień, najgorszy wynik, średnią arytmetyczną oraz odchylenie standardowe.
+
 \begin{table}[H]
 \centering
 \scriptsize
-\caption{Zbiorcze statystyki (przed tuningiem)}
+\caption{Wyniki zbiorcze przed strojeniem metaheurystyk}
 \resizebox{\textwidth}{!}{%
 \begin{tabular}{lrrrrrrrrrrrrrrrrrrrrr}
 \toprule
 Instance & Optimal & Random Runs & Random Best & Random Worst & Random Avg & Random Std & Greedy Runs & Greedy Best & Greedy Worst & Greedy Avg & Greedy Std & EA Runs & EA Best & EA Worst & EA Avg & EA Std & SA Runs & SA Best & SA Worst & SA Avg & SA Std \\
 \midrule
-A-n54-k7 & 1167 & 1000 & 2449 & 2848 & 2724.51 & 60.2820 & 54 & 1380 & 1380 & 1380 & 0.00 & 10 & 1409 & 1644 & 1500.80 & 81.8997 & 10 & 1273 & 1446 & 1376.30 & 44.8844 \\
-A-n39-k5 & 822 & 1000 & 1552 & 1865 & 1748.80 & 45.3239 & 39 & 920 & 920 & 920 & 0.00 & 10 & 969 & 1105 & 1049.90 & 48.8190 & 10 & 907 & 1004 & 945.10 & 32.2380 \\
-A-n32-k5 & 784 & 1000 & 1420 & 1781 & 1655.76 & 49.8083 & 32 & 941 & 941 & 941 & 0.00 & 10 & 941 & 1041 & 991.40 & 29.4761 & 10 & 842 & 949 & 895.70 & 29.4824 \\
-A-n37-k6 & 949 & 1000 & 1549 & 1880 & 1788.69 & 45.1863 & 37 & 1058 & 1058 & 1058 & 0.00 & 10 & 1039 & 1242 & 1119.90 & 57.5994 & 10 & 967 & 1097 & 1038.10 & 36.8658 \\
-A-n48-k7 & 1073 & 1000 & 2166 & 2549 & 2390.06 & 56.3475 & 48 & 1301 & 1301 & 1301 & 0.00 & 10 & 1246 & 1415 & 1345.00 & 52.5928 & 10 & 1188 & 1315 & 1241.40 & 35.7413 \\
-A-n60-k9 & 1354 & 1000 & 2834 & 3226 & 3104.78 & 64.5207 & 60 & 1524 & 1524 & 1524 & 0.00 & 10 & 1605 & 1805 & 1695.80 & 63.2784 & 10 & 1480 & 1604 & 1549.10 & 36.3496 \\
-A-n45-k6 & 944 & 1000 & 2077 & 2428 & 2303.96 & 55.3456 & 45 & 1119 & 1119 & 1119 & 0.00 & 10 & 1131 & 1400 & 1228.70 & 82.5022 & 10 & 1027 & 1160 & 1100.40 & 39.5505 \\
+A-n32-k5 & 784 & 1000 & 1306 & 1745 & 1627.68 & 46.93 & 32 & 941 & 941 & 941 & 0.00 & 10 & 914 & 1066 & 991.5 & 48.55 & 10 & 830 & 937 & 889 & 36.10 \\
+A-n37-k6 & 949 & 1000 & 1551 & 1866 & 1762.47 & 43.20 & 37 & 1058 & 1058 & 1058 & 0.00 & 10 & 1006 & 1131 & 1064.7 & 38.71 & 10 & 995 & 1066 & 1026.2 & 22.64 \\
+A-n39-k5 & 822 & 1000 & 1518 & 1820 & 1720.1 & 43.49 & 39 & 920 & 920 & 920 & 0.00 & 10 & 935 & 1109 & 1015.2 & 51.17 & 10 & 862 & 1022 & 940.6 & 49.76 \\
+A-n45-k6 & 944 & 1000 & 1986 & 2395 & 2268.04 & 55.15 & 45 & 1119 & 1119 & 1119 & 0.00 & 10 & 1116 & 1445 & 1236.6 & 116.18 & 10 & 1007 & 1252 & 1120.5 & 70.88 \\
+A-n48-k7 & 1073 & 1000 & 2108 & 2472 & 2354.95 & 56.97 & 48 & 1301 & 1301 & 1301 & 0.00 & 10 & 1256 & 1452 & 1365.2 & 59.04 & 10 & 1208 & 1318 & 1257.4 & 30.73 \\
+A-n54-k7 & 1167 & 1000 & 2395 & 2814 & 2689.17 & 59.84 & 54 & 1380 & 1380 & 1380 & 0.00 & 10 & 1380 & 1610 & 1509 & 73.11 & 10 & 1298 & 1436 & 1359.8 & 40.73 \\
+A-n60-k9 & 1354 & 1000 & 2777 & 3193 & 3068.58 & 62.74 & 60 & 1524 & 1524 & 1524 & 0.00 & 10 & 1563 & 1823 & 1672.7 & 86.57 & 10 & 1501 & 1638 & 1570.3 & 43.11 \\
 \bottomrule
 \end{tabular}}
 \end{table}
 \clearpage
 
-\subsection{Wybrane wykresy}
-Poniżej trzy przykładowe zestawy wykresów (instancje A-n32-k5, A-n45-k6, A-n60-k9). Dla każdej instancji pokazano: (1) przebiegi best wszystkich algorytmów, (2) przebiegi pojedynczych algorytmów (best/current/avg/worst), (3) słupki najlepszych wyników z wielu uruchomień.
+\subsection{Wykresy}
+
+Poniżej przedstawiono wykresy dla trzech wybranych instancji. Dla każdej instancji pokazano:
+\begin{itemize}
+    \item Porównanie najlepszych przebiegów (best) wszystkich algorytmów (pojedyncze uruchomienie),
+    \item Przebiegi: najlepsze (best) / bieżące (current) / średnie (avg) / najgorsze (worst) poszczególnych algorytmów (pojedyncze uruchomienie),
+    \item Porównanie najlepszych wyników ze wszystkich uruchomień (wykres słupkowy).
+\end{itemize}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{plots_baseline/A-n32-k5/combined_best.png}
-    \caption{A-n32-k5: porównanie przebiegów najlepszych wyników.}
+    \caption{A-n32-k5: porównanie najlepszych przebiegów (best) wszystkich algorytmów (pojedyncze uruchomienie)}
 \end{figure}
 
 \begin{figure}[H]
@@ -112,19 +165,19 @@ Poniżej trzy przykładowe zestawy wykresów (instancje A-n32-k5, A-n45-k6, A-n6
     \includegraphics[width=0.48\textwidth]{plots_baseline/A-n32-k5/greedy_single.png}\\
     \includegraphics[width=0.48\textwidth]{plots_baseline/A-n32-k5/sa_single.png}
     \includegraphics[width=0.48\textwidth]{plots_baseline/A-n32-k5/ea_single.png}
-    \caption{A-n32-k5: przebiegi pojedynczych algorytmów (best/current/avg/worst).}
+    \caption{A-n32-k5: przebiegi poszczególnych algorytmów - najlepsze/bieżące/średnie/najgorsze (best/current/avg/worst) dla pojedynczego uruchomienia}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{plots_baseline/A-n32-k5/bar_best.png}
-    \caption{A-n32-k5: najlepsze wyniki ze wszystkich uruchomień (losowy/greedy/SA/EA) z linią optimum.}
+    \caption{A-n32-k5: porównanie najlepszych wyników ze wszystkich uruchomień z linią optimum}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{plots_baseline/A-n45-k6/combined_best.png}
-    \caption{A-n45-k6: porównanie przebiegów najlepszych wyników.}
+    \caption{A-n45-k6: porównanie najlepszych przebiegów (best) wszystkich algorytmów (pojedyncze uruchomienie)}
 \end{figure}
 
 \begin{figure}[H]
@@ -133,19 +186,19 @@ Poniżej trzy przykładowe zestawy wykresów (instancje A-n32-k5, A-n45-k6, A-n6
     \includegraphics[width=0.48\textwidth]{plots_baseline/A-n45-k6/greedy_single.png}\\
     \includegraphics[width=0.48\textwidth]{plots_baseline/A-n45-k6/sa_single.png}
     \includegraphics[width=0.48\textwidth]{plots_baseline/A-n45-k6/ea_single.png}
-    \caption{A-n45-k6: przebiegi pojedynczych algorytmów.}
+    \caption{A-n45-k6: przebiegi poszczególnych algorytmów - najlepsze/bieżące/średnie/najgorsze (best/current/avg/worst) dla pojedynczego uruchomienia}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{plots_baseline/A-n45-k6/bar_best.png}
-    \caption{A-n45-k6: najlepsze wyniki ze wszystkich uruchomień z linią optimum.}
+    \caption{A-n45-k6: porównanie najlepszych wyników ze wszystkich uruchomień z linią optimum}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{plots_baseline/A-n60-k9/combined_best.png}
-    \caption{A-n60-k9: porównanie przebiegów najlepszych wyników.}
+    \caption{A-n60-k9: porównanie najlepszych przebiegów (best) wszystkich algorytmów (pojedyncze uruchomienie)}
 \end{figure}
 
 \begin{figure}[H]
@@ -154,13 +207,13 @@ Poniżej trzy przykładowe zestawy wykresów (instancje A-n32-k5, A-n45-k6, A-n6
     \includegraphics[width=0.48\textwidth]{plots_baseline/A-n60-k9/greedy_single.png}\\
     \includegraphics[width=0.48\textwidth]{plots_baseline/A-n60-k9/sa_single.png}
     \includegraphics[width=0.48\textwidth]{plots_baseline/A-n60-k9/ea_single.png}
-    \caption{A-n60-k9: przebiegi pojedynczych algorytmów.}
+    \caption{A-n60-k9: przebiegi poszczególnych algorytmów - najlepsze/bieżące/średnie/najgorsze (best/current/avg/worst) dla pojedynczego uruchomienia}
 \end{figure}
 
 \begin{figure}[H]
     \centering
     \includegraphics[width=0.9\textwidth]{plots_baseline/A-n60-k9/bar_best.png}
-    \caption{A-n60-k9: najlepsze wyniki ze wszystkich uruchomień z linią optimum.}
+    \caption{A-n60-k9: porównanie najlepszych wyników ze wszystkich uruchomień z linią optimum}
 \end{figure}
 
 \subsection{Wnioski (etap bazowy)}
@@ -171,7 +224,368 @@ Poniżej trzy przykładowe zestawy wykresów (instancje A-n32-k5, A-n45-k6, A-n6
     \item Dalsze kroki: strojenie parametrów, dodanie nowych operatorów.
 \end{itemize}
 
-\section{Wyniki badań po tuningu}
-TO DO (do uzupełnienia po dodaniu operatorów i uruchomieniu \texttt{config\_tuning.ini}).
+\section{Wyniki badań po strojeniu}
+\label{sec:tuning}
+
+Przeprowadzono cztery etapy dostrajania parametrów algorytmów EA i SA, testując różne strategie optymalizacji. Każde strojenie koncentrowało się na innym aspekcie: lepsze operatory genetyczne, eksploatacja lokalna, czysta eksploracja oraz hybrydowe połączenie najlepszych cech.
+
+\subsection{Strojenie \#1: Lepsze operatory + podstawowe wzmocnienie}
+\label{sec:tuning1}
+
+\subsubsection{Cel i parametry}
+Celem pierwszego strojenia było wprowadzenie bardziej zaawansowanych operatorów genetycznych oraz wzmocnienie parametrów obu metaheurystyk. Kluczowe zmiany względem \hyperref[sec:baseline]{baseline}:
+
+\textbf{EA:}
+\begin{itemize}
+    \item Zmiana operatorów krzyżowania: OX $\rightarrow$ PMX
+    \item Zmiana operatorów mutacji: swap $\rightarrow$ inversion
+    \item Populacja: 100 $\rightarrow$ 120
+    \item Crossover rate: 0.7 $\rightarrow$ 0.85
+    \item Mutation rate: 0.1 $\rightarrow$ 0.20
+    \item Tournament: 5 $\rightarrow$ 3 (słabsza presja selekcyjna)
+    \item Elites: 1 $\rightarrow$ 2
+\end{itemize}
+
+\textbf{SA:}
+\begin{itemize}
+    \item Temperatura początkowa: 100 $\rightarrow$ 800 (8x wzrost)
+    \item Iteracje na temperaturę: 20 $\rightarrow$ 150 (7.5x wzrost)
+    \item Szacowana liczba kroków: $\sim$1800 $\rightarrow$ $\sim$16000
+\end{itemize}
+
+\subsubsection{Wyniki}
+
+Tabela przedstawia statystyki wyników z 10 uruchomień EA i SA dla każdej instancji (format jak w sekcji \hyperref[sec:baseline]{baseline}: Best/Worst/Avg/Std oznaczają odpowiednio najlepszy, najgorszy, średni i odchylenie standardowe wyników ze wszystkich uruchomień).
+
+\begin{table}[H]
+\centering
+\scriptsize
+\caption{Wyniki strojenia \#1 - lepsze operatory (PMX + inversion)}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrrrrrrrrrrrrrrrrr}
+\toprule
+Instance & Optimal & Random Runs & Random Best & Random Worst & Random Avg & Random Std & Greedy Runs & Greedy Best & Greedy Worst & Greedy Avg & Greedy Std & EA Runs & EA Best & EA Worst & EA Avg & EA Std & SA Runs & SA Best & SA Worst & SA Avg & SA Std \\
+\midrule
+A-n32-k5 & 784 & 1000 & 1404 & 1793 & 1655.46 & 52.12 & 32 & 941 & 941 & 941 & 0.00 & 10 & 807 & 926 & 884.2 & 38.32 & 10 & 796 & 863 & 829.6 & 17.14 \\
+A-n37-k6 & 949 & 1000 & 1602 & 1893 & 1788.62 & 46.86 & 37 & 1058 & 1058 & 1058 & 0.00 & 10 & 977 & 1057 & 1017.8 & 24.21 & 10 & 963 & 1013 & 989.8 & 17.74 \\
+A-n39-k5 & 822 & 1000 & 1527 & 1851 & 1745.25 & 48.75 & 39 & 920 & 920 & 920 & 0.00 & 10 & 857 & 1017 & 921.8 & 54.01 & 10 & 838 & 941 & 878.2 & 31.29 \\
+A-n45-k6 & 944 & 1000 & 1916 & 2434 & 2295.73 & 60.24 & 45 & 1119 & 1119 & 1119 & 0.00 & 10 & 1008 & 1216 & 1131.4 & 66.37 & 10 & 971 & 1098 & 1007.8 & 37.88 \\
+A-n48-k7 & 1073 & 1000 & 2155 & 2526 & 2388.64 & 59.29 & 48 & 1301 & 1301 & 1301 & 0.00 & 10 & 1237 & 1353 & 1295.3 & 37.68 & 10 & 1120 & 1188 & 1162.1 & 21.15 \\
+A-n54-k7 & 1167 & 1000 & 2453 & 2864 & 2722.84 & 60.67 & 54 & 1380 & 1380 & 1380 & 0.00 & 10 & 1250 & 1450 & 1361.1 & 62.44 & 10 & 1232 & 1317 & 1262 & 27.39 \\
+A-n60-k9 & 1354 & 1000 & 2762 & 3243 & 3103.12 & 65.95 & 60 & 1524 & 1524 & 1524 & 0.00 & 10 & 1558 & 1753 & 1638.6 & 50.02 & 10 & 1390 & 1532 & 1473.9 & 38.56 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\subsubsection{Analiza wyników}
+\textbf{Poprawa względem \hyperref[sec:baseline]{baseline}:}
+\begin{itemize}
+    \item \textbf{EA:} Średnia najlepszych wyników (z kolumny best dla wszystkich 7 instancji): 1167.1 $\rightarrow$ 1099.1 (poprawa o 5.8\%). Wprowadzenie operatorów PMX i inversion znacząco poprawiło jakość rozwiązań.
+    \item \textbf{SA:} Średnia najlepszych wyników: 1100.1 $\rightarrow$ 1044.3 (poprawa o 5.1\%). Zwiększenie budżetu obliczeń pozwoliło na lepszą eksplorację przestrzeni.
+    \item \textbf{EA vs Greedy:} EA zaczął osiągać lepsze wyniki niż greedy (np. A-n32-k5: 807 vs 941).
+\end{itemize}
+
+\textbf{Wnioski:}
+\begin{itemize}
+    \item Operatory PMX i inversion są wyraźnie lepsze niż OX i swap dla problemu CVRP:
+    \begin{itemize}
+        \item PMX lepiej zachowuje względne pozycje klientów (ważne dla struktury tras)
+        \item Inversion wprowadza większe zmiany niż swap, co poprawia eksplorację przestrzeni rozwiązań
+    \end{itemize}
+    \item Zwiększenie budżetu obliczeń SA dało wyraźną poprawę bez ryzyka przedwczesnej zbieżności.
+    \item Zmniejszenie presji selekcyjnej (tournament 5$\rightarrow$3) pomogło w utrzymaniu różnorodności populacji.
+\end{itemize}
+
+\subsubsection{Wykresy (A-n45-k6)}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{plots_first_tuning/A-n45-k6/bar_best.png}
+    \caption{Strojenie \#1 (A-n45-k6): porównanie najlepszych wyników ze wszystkich uruchomień}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.48\textwidth]{plots_first_tuning/A-n45-k6/ea_single.png}
+    \includegraphics[width=0.48\textwidth]{plots_first_tuning/A-n45-k6/sa_single.png}
+    \caption{Strojenie \#1 (A-n45-k6): przebiegi pojedynczych uruchomień EA i SA}
+\end{figure}
+
+\clearpage
+
+\subsection{Strojenie \#2: Eksploatacja lokalna}
+\label{sec:tuning2}
+
+\subsubsection{Cel i parametry}
+Celem drugiego strojenia było przetestowanie czy eksploatacja lokalna (greedy seeding + 2-opt) poprawi wyniki EA. Wprowadzono mechanizmy szybkiego znajdowania dobrych rozwiązań poprzez:
+
+\textbf{EA:}
+\begin{itemize}
+    \item Populacja: 120 $\rightarrow$ 150
+    \item Generacje: 2000 $\rightarrow$ 2500
+    \item Crossover rate: 0.85 $\rightarrow$ 0.90
+    \item Mutation rate: 0.20 $\rightarrow$ 0.15 (mniej eksploracji)
+    \item Tournament: 3 $\rightarrow$ 5 (silniejsza presja)
+    \item Elites: 2 $\rightarrow$ 3
+    \item \textbf{Greedy init: 0.0 $\rightarrow$ 0.3} (30\% populacji z greedy)
+    \item \textbf{2-opt rate: 0.0 $\rightarrow$ 0.2} (lokalna poprawa)
+\end{itemize}
+
+\textbf{SA:}
+\begin{itemize}
+    \item Temperatura początkowa: 800 $\rightarrow$ 1400
+    \item Minimalna temperatura: 0.001 $\rightarrow$ 0.0005
+    \item Cooling rate: 0.995 $\rightarrow$ 0.996
+    \item Iteracje na temperaturę: 150 $\rightarrow$ 200
+    \item Szacowana liczba kroków: $\sim$16000 $\rightarrow$ $\sim$65000
+\end{itemize}
+
+\subsubsection{Wyniki}
+
+\begin{table}[H]
+\centering
+\scriptsize
+\caption{Wyniki strojenia \#2 (eksploatacja)}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrrrrrrrrrrrrrrrrr}
+\toprule
+Instance & Optimal & Random Runs & Random Best & Random Worst & Random Avg & Random Std & Greedy Runs & Greedy Best & Greedy Worst & Greedy Avg & Greedy Std & EA Runs & EA Best & EA Worst & EA Avg & EA Std & SA Runs & SA Best & SA Worst & SA Avg & SA Std \\
+\midrule
+A-n32-k5 & 784 & 1000 & 1428 & 1773 & 1655.2 & 52.79 & 32 & 941 & 941 & 941 & 0.00 & 10 & 811 & 889 & 847.4 & 22.60 & 10 & 807 & 880 & 835.9 & 19.81 \\
+A-n37-k6 & 949 & 1000 & 1623 & 1890 & 1789.93 & 44.82 & 37 & 1058 & 1058 & 1058 & 0.00 & 10 & 970 & 989 & 976.8 & 6.85 & 10 & 956 & 1007 & 978.4 & 15.07 \\
+A-n39-k5 & 822 & 1000 & 1567 & 1856 & 1748.07 & 46.63 & 39 & 920 & 920 & 920 & 0.00 & 10 & 834 & 858 & 844 & 7.39 & 10 & 830 & 875 & 850.4 & 14.45 \\
+A-n45-k6 & 944 & 1000 & 2001 & 2435 & 2300.71 & 59.04 & 45 & 1119 & 1119 & 1119 & 0.00 & 10 & 992 & 1063 & 1021.2 & 26.05 & 10 & 960 & 1042 & 1000.1 & 23.85 \\
+A-n48-k7 & 1073 & 1000 & 2183 & 2517 & 2388.07 & 57.76 & 48 & 1301 & 1301 & 1301 & 0.00 & 10 & 1136 & 1239 & 1190.5 & 31.67 & 10 & 1114 & 1173 & 1153.3 & 14.97 \\
+A-n54-k7 & 1167 & 1000 & 2347 & 2866 & 2723.43 & 60.82 & 54 & 1380 & 1380 & 1380 & 0.00 & 10 & 1226 & 1282 & 1248.1 & 16.11 & 10 & 1201 & 1290 & 1252.1 & 25.09 \\
+A-n60-k9 & 1354 & 1000 & 2880 & 3243 & 3106.46 & 62.77 & 60 & 1524 & 1524 & 1524 & 0.00 & 10 & 1376 & 1421 & 1394 & 12.17 & 10 & 1407 & 1490 & 1447.7 & 27.93 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\subsubsection{Analiza wyników}
+\textbf{Poprawa względem strojenia \#1:}
+\begin{itemize}
+    \item \textbf{EA:} Średnia najlepszych wyników (z kolumny best dla wszystkich 7 instancji): 1099.1 $\rightarrow$ 1049.3 (poprawa o 4.5\%). Najlepszy wynik EA spośród wszystkich strojeń!
+    \item \textbf{SA:} Średnia najlepszych wyników: 1044.3 $\rightarrow$ 1039.3 (poprawa o 0.5\%).
+    \item \textbf{Stabilność EA:} Zauważalnie mniejsze odchylenie standardowe (np. A-n54-k7: 62.44 $\rightarrow$ 16.11).
+\end{itemize}
+
+\textbf{Wnioski:}
+\begin{itemize}
+    \item \textbf{Zaskakujący wynik:} Eksploatacja (greedy seeding + 2-opt) faktycznie pomogła EA osiągnąć najlepsze średnie wyniki.
+    \item Greedy seeding (30\% populacji) pozwolił na szybsze znalezienie dobrych obszarów przestrzeni rozwiązań.
+    \item Lokalna poprawa 2-opt skutecznie dopracowywała rozwiązania przed oceną.
+    \item  Ryzyko: analiza przebiegów EA pokazuje, że silna eksploatacja (\hyperref[sec:tuning2]{strojenie \#2}) prowadzi do przedwczesnej zbieżności - najlepszy wynik osiągnął wartość 1045 już w połowie eksperymentu i nie poprawił się w drugiej połowie, a avg zbliżyło się do best (różnica ~1\%), co wskazuje na utratę różnorodności populacji.
+\end{itemize}
+
+\subsubsection{Wykresy (A-n45-k6)}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{plots_second_tuning/A-n45-k6/bar_best.png}
+    \caption{Strojenie \#2 (A-n45-k6): porównanie najlepszych wyników ze wszystkich uruchomień}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.48\textwidth]{plots_second_tuning/A-n45-k6/ea_single.png}
+    \includegraphics[width=0.48\textwidth]{plots_second_tuning/A-n45-k6/sa_single.png}
+    \caption{Strojenie \#2 (A-n45-k6): przebiegi pojedynczych uruchomień EA i SA}
+\end{figure}
+
+\clearpage
+
+\subsection{Strojenie \#3: Czysta eksploracja}
+\label{sec:tuning3}
+
+\subsubsection{Cel i parametry}
+Trzecie strojenie testowało przeciwne podejście: czystą eksplorację bez mechanizmów eksploatacji. Celem było sprawdzenie czy wolniejsza, ale szersza eksploracja przestrzeni da lepsze wyniki niż eksploatacja ze strojenia \#2.
+
+\textbf{EA:}
+\begin{itemize}
+    \item Populacja: 150 $\rightarrow$ 200 (większa różnorodność)
+    \item Generacje: 2500 $\rightarrow$ 4000 (więcej czasu)
+    \item Crossover rate: 0.90 $\rightarrow$ 0.75 (więcej czystej mutacji)
+    \item Mutation rate: 0.15 $\rightarrow$ 0.30 (dwukrotnie wyższa)
+    \item Tournament: 5 $\rightarrow$ 2 (minimalna presja)
+    \item Elites: 3 $\rightarrow$ 1
+    \item \textbf{Greedy init: 0.3 $\rightarrow$ 0.0} (bez greedy seeding)
+    \item \textbf{2-opt rate: 0.2 $\rightarrow$ 0.0} (bez lokalnej poprawy)
+\end{itemize}
+
+\textbf{SA:}
+\begin{itemize}
+    \item Temperatura początkowa: 1400 $\rightarrow$ 1800 (maksymalna)
+    \item Minimalna temperatura: 0.0005 (bez zmian)
+    \item Cooling rate: 0.996 $\rightarrow$ 0.9975 (najwolniejsze chłodzenie)
+    \item Iteracje na temperaturę: 200 $\rightarrow$ 250 (maksimum)
+    \item Szacowana liczba kroków: $\sim$65000 $\rightarrow$ $\sim$400000
+\end{itemize}
+
+\subsubsection{Wyniki}
+
+\begin{table}[H]
+\centering
+\scriptsize
+\caption{Wyniki strojenia \#3 (czysta eksploracja)}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrrrrrrrrrrrrrrrrr}
+\toprule
+Instance & Optimal & Random Runs & Random Best & Random Worst & Random Avg & Random Std & Greedy Runs & Greedy Best & Greedy Worst & Greedy Avg & Greedy Std & EA Runs & EA Best & EA Worst & EA Avg & EA Std & SA Runs & SA Best & SA Worst & SA Avg & SA Std \\
+\midrule
+A-n32-k5 & 784 & 1000 & 1472 & 1766 & 1654.27 & 50.15 & 32 & 941 & 941 & 941 & 0.00 & 10 & 814 & 873 & 843.5 & 17.51 & 10 & 801 & 852 & 817.2 & 16.78 \\
+A-n37-k6 & 949 & 1000 & 1577 & 1888 & 1789.28 & 45.09 & 37 & 1058 & 1058 & 1058 & 0.00 & 10 & 975 & 1057 & 1008.1 & 25.67 & 10 & 949 & 1018 & 972.8 & 19.96 \\
+A-n39-k5 & 822 & 1000 & 1507 & 1879 & 1749.35 & 46.68 & 39 & 920 & 920 & 920 & 0.00 & 10 & 833 & 908 & 873.6 & 27.88 & 10 & 839 & 888 & 853.8 & 12.79 \\
+A-n45-k6 & 944 & 1000 & 2011 & 2438 & 2303.01 & 56.27 & 45 & 1119 & 1119 & 1119 & 0.00 & 10 & 953 & 1077 & 1022.8 & 37.16 & 10 & 973 & 1045 & 1003.1 & 21.33 \\
+A-n48-k7 & 1073 & 1000 & 2100 & 2528 & 2390.14 & 57.34 & 48 & 1301 & 1301 & 1301 & 0.00 & 10 & 1112 & 1262 & 1169.1 & 43.45 & 10 & 1118 & 1171 & 1142.7 & 17.11 \\
+A-n54-k7 & 1167 & 1000 & 2476 & 2872 & 2723.63 & 60.37 & 54 & 1380 & 1380 & 1380 & 0.00 & 10 & 1221 & 1342 & 1288.8 & 37.52 & 10 & 1190 & 1240 & 1218.2 & 16.19 \\
+A-n60-k9 & 1354 & 1000 & 2797 & 3252 & 3104.53 & 63.49 & 60 & 1524 & 1524 & 1524 & 0.00 & 10 & 1475 & 1586 & 1502.3 & 30.94 & 10 & 1391 & 1473 & 1413.5 & 27.02 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\subsubsection{Analiza wyników}
+\textbf{Porównanie ze strojeniem \#2:}
+\begin{itemize}
+    \item \textbf{EA:} Średnia najlepszych wyników (best): 1049.3 $\rightarrow$ 1054.7 (pogorszenie o 0.5\%). Czysta eksploracja była nieznacznie gorsza.
+    \item \textbf{SA:} Średnia najlepszych wyników (best): 1039.3 $\rightarrow$ 1037.3 (poprawa o 0.2\%). Najlepszy wynik SA!
+    \item \textbf{Stabilność:} EA ma większe odchylenie standardowe (eksploracja vs eksploatacja).
+\end{itemize}
+
+\textbf{Wnioski:}
+\begin{itemize}
+    \item Czysta eksploracja dała nieznacznie gorsze wyniki niż eksploatacja w (\hyperref[sec:tuning2]{strojeniu \#2}) dla EA. Jedyny zysk z eksploracji zauważono dla średnio trudnych instancji.
+    \item SA skorzystał na maksymalnych parametrach - długi budżet obliczeń pozwolił na dogłębną eksplorację.
+    \item EA: brak greedy seeding oznaczał start z gorszych rozwiązań, co wymagało więcej pokoleń na osiągnięcie dobrych wyników.
+    \item Wysoka mutacja (0.30) mogła zakłócać konwergencję do optymalnych rozwiązań.
+\end{itemize}
+
+\subsubsection{Wykresy (A-n45-k6)}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{plots_third_tuning/A-n45-k6/bar_best.png}
+    \caption{Strojenie \#3 (A-n45-k6): porównanie najlepszych wyników ze wszystkich uruchomień}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.48\textwidth]{plots_third_tuning/A-n45-k6/ea_single.png}
+    \includegraphics[width=0.48\textwidth]{plots_third_tuning/A-n45-k6/sa_single.png}
+    \caption{Strojenie \#3 (A-n45-k6): przebiegi pojedynczych uruchomień EA i SA}
+\end{figure}
+
+\clearpage
+
+\subsection{Strojenie \#4: Hybrydowe połączenie}
+\label{sec:tuning4}
+
+\subsubsection{Cel i parametry}
+Czwarte strojenie łączy najlepsze cechy eksploatacji (\hyperref[sec:tuning2]{strojenie \#2}) i eksploracji (\hyperref[sec:tuning3]{strojenie \#3}). Na podstawie wyników poprzednich eksperymentów zaprojektowano zbalansowane parametry:
+
+\textbf{EA:}
+\begin{itemize}
+    \item Populacja: 180 (między 150 a 200)
+    \item Generacje: 3500 (między 2500 a 4000)
+    \item Crossover rate: 0.82 (między 0.90 a 0.75)
+    \item Mutation rate: 0.23 (między 0.15 a 0.30)
+    \item Tournament: 3 (między 5 a 2)
+    \item Elites: 2 (między 3 a 1)
+    \item \textbf{Greedy init: 0.15} (połowa ze strojenia \#2)
+    \item \textbf{2-opt rate: 0.10} (połowa ze strojenia \#2)
+\end{itemize}
+
+\textbf{SA:}
+\begin{itemize}
+    \item Parametry jak w strojeniu \#3 (maksymalne, udowodniony sukces)
+    \item Temperatura: 1800, min: 0.0005, cooling: 0.9975, iter/temp: 250
+\end{itemize}
+
+\subsubsection{Wyniki}
+
+\begin{table}[H]
+\centering
+\scriptsize
+\caption{Wyniki strojenia \#4 (hybryda)}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lrrrrrrrrrrrrrrrrrrrrr}
+\toprule
+Instance & Optimal & Random Runs & Random Best & Random Worst & Random Avg & Random Std & Greedy Runs & Greedy Best & Greedy Worst & Greedy Avg & Greedy Std & EA Runs & EA Best & EA Worst & EA Avg & EA Std & SA Runs & SA Best & SA Worst & SA Avg & SA Std \\
+\midrule
+A-n32-k5 & 784 & 1000 & 1414 & 1767 & 1656.6 & 49.36 & 32 & 941 & 941 & 941 & 0.00 & 10 & 829 & 866 & 838.4 & 11.83 & 10 & 801 & 875 & 826.8 & 21.66 \\
+A-n37-k6 & 949 & 1000 & 1601 & 1904 & 1787.76 & 46.74 & 37 & 1058 & 1058 & 1058 & 0.00 & 10 & 970 & 983 & 974.4 & 4.01 & 10 & 953 & 992 & 971.8 & 12.87 \\
+A-n39-k5 & 822 & 1000 & 1483 & 1856 & 1745.98 & 48.33 & 39 & 920 & 920 & 920 & 0.00 & 10 & 834 & 851 & 840.7 & 5.62 & 10 & 835 & 876 & 853.2 & 14.77 \\
+A-n45-k6 & 944 & 1000 & 2079 & 2430 & 2301.06 & 57.05 & 45 & 1119 & 1119 & 1119 & 0.00 & 10 & 962 & 1048 & 994.9 & 21.35 & 10 & 947 & 1026 & 983.7 & 21.87 \\
+A-n48-k7 & 1073 & 1000 & 2125 & 2517 & 2385.71 & 60.70 & 48 & 1301 & 1301 & 1301 & 0.00 & 10 & 1154 & 1207 & 1186.6 & 14.75 & 10 & 1107 & 1183 & 1146.1 & 21.62 \\
+A-n54-k7 & 1167 & 1000 & 2490 & 2885 & 2726.76 & 60.02 & 54 & 1380 & 1380 & 1380 & 0.00 & 10 & 1206 & 1257 & 1235.3 & 16.91 & 10 & 1190 & 1286 & 1231.2 & 32.70 \\
+A-n60-k9 & 1354 & 1000 & 2855 & 3238 & 3108.23 & 61.58 & 60 & 1524 & 1524 & 1524 & 0.00 & 10 & 1374 & 1423 & 1398.6 & 18.32 & 10 & 1380 & 1474 & 1414.9 & 25.57 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\subsubsection{Analiza wyników}
+\textbf{Porównanie z najlepszymi wynikami:}
+\begin{itemize}
+    \item \textbf{EA:} Średnia najlepszych wyników (z kolumny best dla wszystkich 7 instancji): 1048.1 - między \hyperref[sec:tuning2]{strojeniem \#2} (1049.3) a \hyperref[sec:tuning3]{\#3} (1054.7).
+    \item \textbf{SA:} Średnia najlepszych wyników: 1041.0 - nieznacznie gorszy niż \hyperref[sec:tuning3]{strojenie \#3} (1037.3).
+    \item \textbf{Stabilność EA:} Bardzo niskie odchylenia standardowe (np. A-n37-k6: 4.01), najlepsze spośród wszystkich strojeń.
+\end{itemize}
+
+\textbf{Wnioski końcowe:}
+\begin{itemize}
+    \item Hybrydowe podejście osiągnęło bardzo stabilne wyniki (niskie std dev) dzięki zbalansowaniu eksploracji i eksploatacji.
+    \item Umiarkowana eksploatacja (greedy 15\%, 2-opt 10\%) okazała się dobrym kompromisem.
+    \item Najlepsze absolutne wyniki EA pochodzą ze strojenia \#2 (eksploatacja), ale kosztem większej zmienności. Zwiększenie budżetu obliczeniowego w podejściu hybrydowym mogłoby przynieść poprawę.
+    \item SA osiągnął plateau w strojeniu \#3 - dalsze zwiększanie parametrów prawdopodobnie nie przyniesie poprawy.
+\end{itemize}
+
+\subsubsection{Wykresy (A-n45-k6)}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.9\textwidth]{plots_fourth_tuning/A-n45-k6/bar_best.png}
+    \caption{Strojenie \#4 (A-n45-k6): porównanie najlepszych wyników ze wszystkich uruchomień}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.48\textwidth]{plots_fourth_tuning/A-n45-k6/ea_single.png}
+    \includegraphics[width=0.48\textwidth]{plots_fourth_tuning/A-n45-k6/sa_single.png}
+    \caption{Strojenie \#4 (A-n45-k6): przebiegi pojedynczych uruchomień EA i SA}
+\end{figure}
+
+\clearpage
+
+\subsection{Podsumowanie strojeń}
+\label{sec:summary}
+
+\begin{table}[H]
+\centering
+\caption{Porównanie średnich najlepszych wyników (best) spośród wszystkich strojeń}
+\begin{tabular}{lcccc}
+\toprule
+Strojenie & EA Best (śr.) & SA Best (śr.) & EA std & SA std \\
+\midrule
+Baseline & 1167.1 & 1100.1 & 64.7 & 41.3 \\
+\#1 (operatory) & 1099.1 & 1044.3 & 48.1 & 27.4 \\
+\#2 (eksploatacja) & \textbf{1049.3} & 1039.3 & 17.6 & 20.5 \\
+\#3 (eksploracja) & 1054.7 & \textbf{1037.3} & 31.5 & 18.6 \\
+\#4 (hybryda) & 1048.1 & 1041.0 & \textbf{13.3} & 21.6 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Kluczowe obserwacje:}
+\begin{enumerate}
+    \item Wprowadzenie operatorów PMX i inversion (\hyperref[sec:tuning1]{strojenie \#1}) dało największy skok jakości (5.8\% dla EA).
+    \item Eksploatacja (\hyperref[sec:tuning2]{strojenie \#2}) wygrała z czystą eksploracją (\hyperref[sec:tuning3]{strojenie \#3}) w EA, mimo że \hyperref[sec:tuning3]{strojenie \#3} miało 60\% więcej generacji (4000 vs 2500). Pokazuje to, że balans między eksploracją a eksploatacją jest kluczowy - zbyt słaba presja selekcyjna i brak lokalnej poprawy prowadzą do gorszych wyników nawet przy dłuższym czasie obliczeń.
+    \item SA konsekwentnie poprawiał się z każdym strojeniem, osiągając optimum w \hyperref[sec:tuning3]{strojeniu \#3}.
+    \item Hybrydowe podejście (\hyperref[sec:tuning4]{strojenie \#4}) dało najbardziej stabilne wyniki przy minimalnie gorszej średniej.
+\end{enumerate}
+
+\vspace{1em}
+\textbf{Najlepszy algorytm dla CVRP:}
+
+W przeprowadzonym badaniu Symulowane Wyżarzanie (SA) okazało się najbardziej skuteczną metaheurystyką dla CVRP, osiągając konsekwentnie lepsze wyniki od Algorytmu Ewolucyjnego we wszystkich konfiguracjach (średnia przewaga 1-6\%). Szczególnie imponujący był wynik w konfiguracji \hyperref[sec:baseline]{baseline}, gdzie SA osiągnęło lepsze rezultaty przy 5x mniejszym budżecie ewaluacji (37,000 vs 200,000). W tym miejscu należy wspomnieć, że różne budżety obliczeniowe w strojeniach utrudniają bezpośrednie porównanie jakości algorytmów. W strojeniach zaawansowanych (\hyperref[sec:tuning2]{\#2}-\hyperref[sec:tuning4]{\#4}) różnice jakości się zmniejszyły - SA miało nieznaczną przewagę, natomiast korzystało z większego budżetu obliczeniowego. Niemniej jednak, SA wyróżnia się prostotą implementacji, mniejszą liczbą hiperparametrów oraz brakiem kosztownych operacji genetycznych, co w całokształcie czyni je praktycznym wyborem dla problemów CVRP.
 
 \end{document}
