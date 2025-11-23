@@ -372,7 +372,7 @@ A-n60-k9 & 1354 & 1000 & 2880 & 3243 & 3106.46 & 62.77 & 60 & 1524 & 1524 & 1524
 
 \textbf{Wnioski:}
 \begin{itemize}
-    \item \textbf{Zaskakujący wynik:} Eksploatacja (greedy seeding + 2-opt) faktycznie pomogła EA osiągnąć najlepsze średnie wyniki.
+    \item Eksploatacja (greedy seeding + 2-opt) faktycznie pomogła EA osiągnąć najlepsze średnie wyniki, co nie było spodziewane.
     \item Greedy seeding (30\% populacji) pozwolił na szybsze znalezienie dobrych obszarów przestrzeni rozwiązań.
     \item Lokalna poprawa 2-opt skutecznie dopracowywała rozwiązania przed oceną.
     \item  Ryzyko: analiza przebiegów EA pokazuje, że silna eksploatacja (\hyperref[sec:tuning2]{strojenie \#2}) prowadzi do przedwczesnej zbieżności - najlepszy wynik osiągnął wartość 1045 już w połowie eksperymentu i nie poprawił się w drugiej połowie, a avg zbliżyło się do best (różnica ~1\%), co wskazuje na utratę różnorodności populacji.
@@ -533,7 +533,7 @@ A-n60-k9 & 1354 & 1000 & 2855 & 3238 & 3108.23 & 61.58 & 60 & 1524 & 1524 & 1524
 
 \textbf{Wnioski końcowe:}
 \begin{itemize}
-    \item Hybrydowe podejście osiągnęło bardzo stabilne wyniki (niskie std dev) dzięki zbalansowaniu eksploracji i eksploatacji.
+    \item Hybrydowe podejście dla EA osiągnęło bardzo stabilne wyniki (niskie std dev) dzięki zbalansowaniu eksploracji i eksploatacji.
     \item Umiarkowana eksploatacja (greedy 15\%, 2-opt 10\%) okazała się dobrym kompromisem.
     \item Najlepsze absolutne wyniki EA pochodzą ze strojenia \#2 (eksploatacja), ale kosztem większej zmienności. Zwiększenie budżetu obliczeniowego w podejściu hybrydowym mogłoby przynieść poprawę.
     \item SA osiągnął plateau w strojeniu \#3 - dalsze zwiększanie parametrów prawdopodobnie nie przyniesie poprawy.
@@ -580,7 +580,7 @@ Baseline & 1167.1 & 1100.1 & 64.7 & 41.3 \\
     \item Wprowadzenie operatorów PMX i inversion (\hyperref[sec:tuning1]{strojenie \#1}) dało największy skok jakości (5.8\% dla EA).
     \item Eksploatacja (\hyperref[sec:tuning2]{strojenie \#2}) wygrała z czystą eksploracją (\hyperref[sec:tuning3]{strojenie \#3}) w EA, mimo że \hyperref[sec:tuning3]{strojenie \#3} miało 60\% więcej generacji (4000 vs 2500). Pokazuje to, że balans między eksploracją a eksploatacją jest kluczowy - zbyt słaba presja selekcyjna i brak lokalnej poprawy prowadzą do gorszych wyników nawet przy dłuższym czasie obliczeń.
     \item SA konsekwentnie poprawiał się z każdym strojeniem, osiągając optimum w \hyperref[sec:tuning3]{strojeniu \#3}.
-    \item Hybrydowe podejście (\hyperref[sec:tuning4]{strojenie \#4}) dało najbardziej stabilne wyniki przy minimalnie gorszej średniej.
+    \item Hybrydowe podejście (\hyperref[sec:tuning4]{strojenie \#4}) dla EA dało najbardziej stabilne wyniki przy minimalnie gorszej średniej.
 \end{enumerate}
 
 \vspace{1em}
